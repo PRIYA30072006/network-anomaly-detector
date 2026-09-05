@@ -19,8 +19,8 @@ column_names = [
     "attack_type", "difficulty_level"
 ]
 
-train_data = pd.read_csv("archive/KDDTrain+.txt", names=column_names)
-test_data = pd.read_csv("archive/KDDTest+.txt", names=column_names)
+train_data = pd.read_csv("KDDTrain+.txt", names=column_names)
+test_data = pd.read_csv("KDDTest+.txt", names=column_names)
 
 train_data["label"] = train_data["attack_type"].apply(lambda x: 0 if x == "normal" else 1)
 test_data["label"] = test_data["attack_type"].apply(lambda x: 0 if x == "normal" else 1)

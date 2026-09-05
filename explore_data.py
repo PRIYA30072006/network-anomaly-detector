@@ -18,7 +18,7 @@ column_names = [
 ]
 
 # Data ah load pannuvom
-data = pd.read_csv("archive/KDDTrain+.txt", names=column_names)
+data = pd.read_csv("KDDTrain+.txt", names=column_names)
 
 # First 5 rows paakalam
 print(data.head())

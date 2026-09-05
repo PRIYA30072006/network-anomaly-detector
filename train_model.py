@@ -21,7 +21,7 @@ column_names = [
 ]
 
 # Load data
-data = pd.read_csv("archive/KDDTrain+.txt", names=column_names)
+data = pd.read_csv("KDDTrain+.txt", names=column_names)
 
 # STEP 1: binary label - 0 = normal, 1 = attack
 data["label"] = data["attack_type"].apply(lambda x: 0 if x == "normal" else 1)

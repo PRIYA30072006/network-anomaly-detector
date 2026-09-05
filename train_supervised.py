@@ -20,7 +20,7 @@ column_names = [
     "attack_type", "difficulty_level"
 ]
 
-data = pd.read_csv("archive/KDDTrain+.txt", names=column_names)
+data = pd.read_csv("KDDTrain+.txt", names=column_names)
 data["label"] = data["attack_type"].apply(lambda x: 0 if x == "normal" else 1)
 
 text_columns = ["protocol_type", "service", "flag"]
