@@ -49,7 +49,7 @@ The project was tested locally in a Python virtual environment. Use a supported 
 ```bash
 python -m venv .venv
 # Windows PowerShell:
-.venv\\Scripts\\Activate.ps1
+.venv\Scripts\Activate.ps1
 # macOS/Linux:
 source .venv/bin/activate
 python -m pip install -r requirements.txt
@@ -85,9 +85,28 @@ streamlit run app.py
 ```
 
 ## Results and interpretation
-The earlier README recorded approximately 77% accuracy and 0.62 attack recall for the separate-test experiment, and approximately 78% accuracy and 0.63 attack recall after class balancing and increasing the number of trees. These are historical figures from the previous preprocessing approach. They have not been reproduced with the corrected unknown-category handling, so do not treat them as the current model's verified performance. Run `python evaluate_model.py` and record its actual output before publishing updated metrics.
 
-A recall near 0.63 means the model identified roughly 63% of the attack examples in that evaluation; it also missed a meaningful portion. Accuracy alone is not enough to judge an intrusion-detection model.
+Latest recorded run of `python evaluate_model.py` on the separate KDDTest+ file:
+
+| Metric | Normal | Attack |
+|---|---:|---:|
+| Precision | 0.6644 | 0.9671 |
+| Recall | 0.9718 | 0.6285 |
+| F1-score | 0.7892 | 0.7619 |
+| Support | 9,711 | 12,833 |
+
+- **Accuracy:** 0.7764 (77.64%)
+- **Confusion matrix** (rows = actual class; columns = predicted class; order = Normal, Attack):
+
+```text
+              Predicted Normal  Predicted Attack
+Actual Normal             9437               274
+Actual Attack             4767              8066
+```
+
+The model detected 8,066 of 12,833 attack records and missed 4,767. Its attack precision is high (96.71%), but attack recall is only 62.85%. This means many records predicted as attacks were attacks in this test, but the model still failed to identify a substantial share of actual attacks. Accuracy alone is not enough to judge an intrusion-detection model.
+
+These figures are the output reported from the current `evaluate_model.py` run; rerun the script in your environment to reproduce them. Results can vary with library versions or environment changes.
 
 ## Known limitations
 - This project uses historical NSL-KDD records; it does not inspect live packets.
