@@ -108,20 +108,21 @@ The model detected 8,066 of 12,833 attack records and missed 4,767. Its attack p
 
 These figures are the output reported from the current `evaluate_model.py` run; rerun the script in your environment to reproduce them. Results can vary with library versions or environment changes.
 
-## Known limitations
-- This project uses historical NSL-KDD records; it does not inspect live packets.
-- The Streamlit demo asks for 11 values and fills the remaining model features with zero. Its predictions are illustrative and may not represent a complete connection record.
-- The evaluation scripts now encode categories not seen during training as `-1` instead of silently replacing them with a different category.
-- The categorical columns currently use `OrdinalEncoder`. This assigns integer codes to nominal categories, which can introduce an artificial ordering. One-hot encoding or a carefully designed preprocessing pipeline can be explored as a future improvement.
-- The Isolation Forest script reports results on the same records used for fitting. This is not an independent test. Its contamination setting is calculated from the known attack-label proportion, so the baseline is not fully label-independent.
-- The saved model and preprocessing files must be generated together and kept compatible.
+## Issues identified during testing and ongoing corrective work
 
-## Future improvements
-- Use a consistent preprocessing pipeline with explicit handling of unseen categories.
-- Evaluate using the separate test set and save reproducible metrics.
-- Improve the manual demo so it validates complete feature inputs.
-- Explore live packet capture and feature extraction as a separate future development phase.
-- Investigate recall-focused threshold tuning and multi-class attack classification.
+Testing has identified the following areas that need attention. The project is currently in a testing-and-correction phase, and work is focused on investigating and addressing these findings before treating the implementation as complete.
+
+| Finding from testing/review | Why it matters | Current status |
+|---|---|---|
+| The Streamlit demo accepts 11 of the model's 41 input features and fills the remaining 30 with zero. | The submitted values do not represent a complete network connection record, so the displayed prediction is illustrative only. | Under investigation; the input and feature-handling design needs correction. |
+| The Isolation Forest baseline is evaluated on the same records used for fitting. | This does not measure performance on unseen data. Its contamination value is also calculated from known attack labels, so the experiment is not fully label-independent. | Evaluation methodology needs correction and clearer separation from the supervised experiments. |
+| The categorical features use `OrdinalEncoder`. | Integer codes can imply an artificial order between nominal categories, which may affect tree splits. | Alternative categorical preprocessing is being assessed and must be compared using the held-out test set. |
+| The dependency file does not pin package versions. | Different installations may use different library versions; serialized model files can also be sensitive to scikit-learn version changes. | The working environment versions need to be recorded before dependency versions are pinned. |
+| The dataset description does not yet include a direct source/reference citation. | Readers should be able to identify and verify the benchmark dataset used. | Dataset source details need to be added and checked. |
+
+The separate KDDTrain+/KDDTest+ evaluation is the current evidence for the reported Random Forest metrics. The recorded result shows 62.85% attack recall and 4,767 missed attack records. Improving attack detection without creating an unacceptable increase in false alarms is an important part of the ongoing testing work.
+
+These findings are not being presented as completed fixes. They are the issues identified so far, and the implementation and evaluation will be updated only after the corresponding changes have been tested.
 
 ## Responsible use
 This is an educational prototype for learning and experimentation with a public benchmark dataset. It is not a production intrusion-detection system and should not be used as the sole basis for security decisions.
