@@ -1,10 +1,16 @@
 import streamlit as st
 import pandas as pd
 import joblib
+from sklearn.preprocessing import OrdinalEncoder
 
 model = joblib.load("model.pkl")
 encoder = joblib.load("encoders.pkl")
 columns = joblib.load("columns.pkl")
+
+# Existing model artifacts may still use the old LabelEncoder format.
+if not isinstance(encoder, OrdinalEncoder):
+    st.error("The saved model files are outdated. Run `python save_model.py` to regenerate model.pkl, encoders.pkl, and columns.pkl, then restart this app.")
+    st.stop()
 text_columns = ["protocol_type", "service", "flag"]
 
 st.title("🛡️ AI Network Anomaly Detector")
