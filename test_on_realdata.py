@@ -1,6 +1,6 @@
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OrdinalEncoder
 from sklearn.metrics import classification_report
 
 column_names = [
@@ -19,24 +19,17 @@ column_names = [
     "attack_type", "difficulty_level"
 ]
 
-# Train data load pannurom
 train_data = pd.read_csv("KDDTrain+.txt", names=column_names)
-# Test data (separate file) load pannurom
 test_data = pd.read_csv("KDDTest+.txt", names=column_names)
 
-train_data["label"] = train_data["attack_type"].apply(lambda x: 0 if x == "normal" else 1)
-test_data["label"] = test_data["attack_type"].apply(lambda x: 0 if x == "normal" else 1)
+for data in (train_data, test_data):
+    data["label"] = (data["attack_type"] != "normal").astype(int)
 
-# IMPORTANT: encoder ah train data mattum fit pannanum, appuram train+test rendukum use pannanum
 text_columns = ["protocol_type", "service", "flag"]
-for col in text_columns:
-    le = LabelEncoder()
-    le.fit(train_data[col])  # train data mattum fit
-
-    # test data la, train la paakaatha puthu values irundha, "unknown" ah handle pannurom
-    train_data[col] = le.transform(train_data[col])
-    test_data[col] = test_data[col].apply(lambda x: x if x in le.classes_ else le.classes_[0])
-    test_data[col] = le.transform(test_data[col])
+encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
+train_data[text_columns] = encoder.fit_transform(train_data[text_columns])
+# Categories not seen in training are encoded as -1, never silently changed to another category.
+test_data[text_columns] = encoder.transform(test_data[text_columns])
 
 X_train = train_data.drop(columns=["attack_type", "difficulty_level", "label"])
 y_train = train_data["label"]
@@ -46,8 +39,7 @@ y_test = test_data["label"]
 print("Training on KDDTrain+, testing on separate KDDTest+ file...")
 clf = RandomForestClassifier(n_estimators=100, random_state=42)
 clf.fit(X_train, y_train)
-
 predictions = clf.predict(X_test)
 
-print("\n--- Performance on UNSEEN test data ---")
+print("\n--- Performance on separate KDDTest+ data ---")
 print(classification_report(y_test, predictions, target_names=["Normal", "Attack"]))
