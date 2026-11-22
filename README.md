@@ -30,13 +30,13 @@ A second Random Forest experiment uses class balancing and 300 trees. Feature im
 | File | Purpose |
 |---|---|
 | `explore_data.py` | Loads and explores the training dataset. |
-| `train_model.py` | Runs the Isolation Forest baseline. |
+| `train_model.py` | Trains an Isolation Forest baseline on KDDTrain+ and evaluates it on the separate KDDTest+ file. |
 | `train_supervised.py` | Trains and evaluates a Random Forest using a random split of KDDTrain+. |
 | `test_on_realdata.py` | Trains on KDDTrain+ and evaluates on KDDTest+. |
 | `test_improved.py` | Tests a class-balanced Random Forest with 300 trees and prints feature importance. |
 | `evaluate_model.py` | Runs a reproducible held-out evaluation and prints a confusion matrix, classification report, and unseen-category counts. |
 | `save_model.py` | Trains the model used by the Streamlit demo and saves the model, encoders, and feature-column list. |
-| `app.py` | Runs the manual-input Streamlit demonstration. |
+| `app.py` | Runs the Streamlit demonstration using uploaded CSV records containing all 41 model features. |
 | `model.pkl` | Saved Random Forest model used by the demo. |
 | `encoders.pkl` | Saved encoders for the three categorical input columns. |
 | `columns.pkl` | Feature-column order expected by the saved model. |
@@ -110,19 +110,19 @@ These figures are the output reported from the current `evaluate_model.py` run; 
 
 ## Issues identified during testing and ongoing corrective work
 
-Testing has identified the following areas that need attention. The project is currently in a testing-and-correction phase, and work is focused on investigating and addressing these findings before treating the implementation as complete.
+Testing and static review have identified several issues. Some implementation changes have now been made, but they must be run and verified in the project environment before they can be considered fully resolved.
 
-| Finding from testing/review | Why it matters | Current status |
-|---|---|---|
-| The Streamlit demo accepts 11 of the model's 41 input features and fills the remaining 30 with zero. | The submitted values do not represent a complete network connection record, so the displayed prediction is illustrative only. | Under investigation; the input and feature-handling design needs correction. |
-| The Isolation Forest baseline is evaluated on the same records used for fitting. | This does not measure performance on unseen data. Its contamination value is also calculated from known attack labels, so the experiment is not fully label-independent. | Evaluation methodology needs correction and clearer separation from the supervised experiments. |
-| The categorical features use `OrdinalEncoder`. | Integer codes can imply an artificial order between nominal categories, which may affect tree splits. | Alternative categorical preprocessing is being assessed and must be compared using the held-out test set. |
-| The dependency file does not pin package versions. | Different installations may use different library versions; serialized model files can also be sensitive to scikit-learn version changes. | The working environment versions need to be recorded before dependency versions are pinned. |
-| The dataset description does not yet include a direct source/reference citation. | Readers should be able to identify and verify the benchmark dataset used. | Dataset source details need to be added and checked. |
+| Finding | Change made / current status |
+|---|---|
+| The previous Streamlit form accepted only 11 of 41 features and filled the rest with zero. | Replaced the partial form with CSV upload requiring all 41 feature columns; added checks for missing columns, empty categorical values, and non-numeric feature values. Runtime verification is pending. |
+| The Isolation Forest baseline was evaluated on its training records and used a contamination value derived from attack labels. | Revised it to fit on KDDTrain+ and evaluate on KDDTest+, with `contamination="auto"`. Runtime verification is pending. |
+| Ordinal encoding assigns integer codes to nominal categories and may introduce artificial ordering. | Still present in the supervised Random Forest workflow and saved demo artifacts. Alternative one-hot preprocessing needs to be evaluated before changing the artifact format. |
+| Dependency versions are not pinned. | Need to record the actual working environment versions before pinning dependencies; no versions have been guessed. |
+| Dataset source citation is missing. | The canonical dataset source and citation details still need to be verified and added. |
 
-The separate KDDTrain+/KDDTest+ evaluation is the current evidence for the reported Random Forest metrics. The recorded result shows 62.85% attack recall and 4,767 missed attack records. Improving attack detection without creating an unacceptable increase in false alarms is an important part of the ongoing testing work.
+The recorded KDDTest+ Random Forest evaluation reports 62.85% attack recall and 4,767 missed attack records. This is a significant detection weakness and remains an important target for further experiments. Do not treat the reported accuracy alone as evidence of a dependable intrusion-detection system.
 
-These findings are not being presented as completed fixes. They are the issues identified so far, and the implementation and evaluation will be updated only after the corresponding changes have been tested.
+**Verification status:** The changes above have been committed to this branch, but they have not yet been executed in the user's local environment after the latest edits. The earlier Random Forest metrics are prior reported output, not fresh test evidence for these new changes.
 
 ## Responsible use
 This is an educational prototype for learning and experimentation with a public benchmark dataset. It is not a production intrusion-detection system and should not be used as the sole basis for security decisions.
