@@ -34,6 +34,7 @@ A second Random Forest experiment uses class balancing and 300 trees. Feature im
 | `train_supervised.py` | Trains and evaluates a Random Forest using a random split of KDDTrain+. |
 | `test_on_realdata.py` | Trains on KDDTrain+ and evaluates on KDDTest+. |
 | `test_improved.py` | Tests a class-balanced Random Forest with 300 trees and prints feature importance. |
+| `evaluate_model.py` | Runs a reproducible held-out evaluation and prints a confusion matrix, classification report, and unseen-category counts. |
 | `save_model.py` | Trains the model used by the Streamlit demo and saves the model, encoders, and feature-column list. |
 | `app.py` | Runs the manual-input Streamlit demonstration. |
 | `model.pkl` | Saved Random Forest model used by the demo. |
@@ -79,15 +80,15 @@ streamlit run app.py
 ```
 
 ## Results and interpretation
-The README previously recorded approximately 77% accuracy and 0.62 attack recall for the separate-test experiment, and approximately 78% accuracy and 0.63 attack recall after class balancing and increasing the number of trees. These figures have not yet been independently reproduced in the current audit. Treat them as previously recorded results until the scripts are rerun and the output is saved.
+The earlier README recorded approximately 77% accuracy and 0.62 attack recall for the separate-test experiment, and approximately 78% accuracy and 0.63 attack recall after class balancing and increasing the number of trees. These are historical figures from the previous preprocessing approach. They have not been reproduced with the corrected unknown-category handling, so do not treat them as the current model's verified performance. Run `python evaluate_model.py` and record its actual output before publishing updated metrics.
 
 A recall near 0.63 means the model identified roughly 63% of the attack examples in that evaluation; it also missed a meaningful portion. Accuracy alone is not enough to judge an intrusion-detection model.
 
 ## Known limitations
 - This project uses historical NSL-KDD records; it does not inspect live packets.
 - The Streamlit demo asks for 11 values and fills the remaining model features with zero. Its predictions are illustrative and may not represent a complete connection record.
-- The test scripts currently replace unseen categorical values with the first category found during training. This needs correction because it changes the meaning of the input.
-- The categorical columns are encoded with LabelEncoder. A consistent one-hot encoding pipeline would be a better follow-up improvement.
+- The evaluation scripts now encode categories not seen during training as `-1` instead of silently replacing them with a different category.
+- The categorical columns currently use `OrdinalEncoder`. One-hot encoding or a carefully designed preprocessing pipeline can be explored as a future improvement.
 - The Isolation Forest script reports results on the same records used for fitting. This is not an independent test.
 - The saved model and preprocessing files must be generated together and kept compatible.
 
