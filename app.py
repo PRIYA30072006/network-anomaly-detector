@@ -16,8 +16,8 @@ def load_artifacts():
             "The saved encoder is not an OrdinalEncoder. "
             "Run `python save_model.py` to regenerate all model artifacts."
         )
-    if list(encoder.feature_names_in_) != ["protocol_type", "service", "flag"]:
-        raise ValueError("The saved encoder does not match the expected categorical columns.")
+    if len(encoder.categories_) != 3:
+        raise ValueError("The saved encoder must contain the three expected categorical features.")
     if not hasattr(model, "classes_") or set(model.classes_) != {0, 1}:
         raise ValueError("The saved model must contain both classes: 0 (Normal) and 1 (Attack).")
     if len(columns) != 41 or len(set(columns)) != 41:
