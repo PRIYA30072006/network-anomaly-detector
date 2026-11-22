@@ -44,10 +44,15 @@ A second Random Forest experiment uses class balancing and 300 trees. Feature im
 | `KDDTest+.txt` | NSL-KDD test dataset. |
 
 ## Requirements
-Python 3.13 is the version recorded during development. Install the required packages:
+The project was tested locally in a Python virtual environment. Use a supported Python version compatible with the installed scikit-learn and Streamlit releases. Install the dependencies from the repository root:
 
 ```bash
-pip install pandas scikit-learn streamlit joblib
+python -m venv .venv
+# Windows PowerShell:
+.venv\\Scripts\\Activate.ps1
+# macOS/Linux:
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
 ## Run the project
@@ -71,7 +76,7 @@ To retrain and save the model files used by the Streamlit demo:
 python save_model.py
 ```
 
-After changing the preprocessing format, regenerate the saved model artifacts before opening the app. The existing committed `.pkl` files were created with the previous encoder and may be incompatible with the updated app.
+The `audit/corrections` branch includes model artifacts regenerated with the same `OrdinalEncoder` format expected by `app.py`. If you retrain or change preprocessing, regenerate all three artifact files together by running `python save_model.py` before launching the app.
 
 To launch the manual-input demo:
 
@@ -88,8 +93,8 @@ A recall near 0.63 means the model identified roughly 63% of the attack examples
 - This project uses historical NSL-KDD records; it does not inspect live packets.
 - The Streamlit demo asks for 11 values and fills the remaining model features with zero. Its predictions are illustrative and may not represent a complete connection record.
 - The evaluation scripts now encode categories not seen during training as `-1` instead of silently replacing them with a different category.
-- The categorical columns currently use `OrdinalEncoder`. One-hot encoding or a carefully designed preprocessing pipeline can be explored as a future improvement.
-- The Isolation Forest script reports results on the same records used for fitting. This is not an independent test.
+- The categorical columns currently use `OrdinalEncoder`. This assigns integer codes to nominal categories, which can introduce an artificial ordering. One-hot encoding or a carefully designed preprocessing pipeline can be explored as a future improvement.
+- The Isolation Forest script reports results on the same records used for fitting. This is not an independent test. Its contamination setting is calculated from the known attack-label proportion, so the baseline is not fully label-independent.
 - The saved model and preprocessing files must be generated together and kept compatible.
 
 ## Future improvements
