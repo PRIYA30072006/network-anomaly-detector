@@ -1,10 +1,13 @@
+"""Unsupervised Isolation Forest baseline evaluated on held-out KDDTest+ data.
+
+The attack labels are used only for evaluation, not for preprocessing or fitting
+the anomaly detector.
+"""
 import pandas as pd
 from sklearn.ensemble import IsolationForest
-from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.metrics import classification_report
 
-# Column names
-column_names = [
+COLUMN_NAMES = [
     "duration", "protocol_type", "service", "flag", "src_bytes",
     "dst_bytes", "land", "wrong_fragment", "urgent", "hot",
     "num_failed_logins", "logged_in", "num_compromised", "root_shell",
@@ -19,41 +22,55 @@ column_names = [
     "dst_host_rerror_rate", "dst_host_srv_rerror_rate",
     "attack_type", "difficulty_level"
 ]
+CATEGORICAL_COLUMNS = ["protocol_type", "service", "flag"]
 
-# Load data
-data = pd.read_csv("KDDTrain+.txt", names=column_names)
 
-# STEP 1: binary label - 0 = normal, 1 = attack
-data["label"] = data["attack_type"].apply(lambda x: 0 if x == "normal" else 1)
+def load_dataset(path):
+    data = pd.read_csv(path, names=COLUMN_NAMES)
+    if data.shape[1] != len(COLUMN_NAMES):
+        raise ValueError(
+            f"{path} has {data.shape[1]} columns; expected {len(COLUMN_NAMES)}."
+        )
+    labels = (data["attack_type"] != "normal").astype(int)
+    features = data.drop(columns=["attack_type", "difficulty_level"])
+    return features, labels
 
-# STEP 2: text columns ah numbers ah convert pannurom
-text_columns = ["protocol_type", "service", "flag"]
-for col in text_columns:
-    le = LabelEncoder()
-    data[col] = le.fit_transform(data[col])
 
-# STEP 3: features (X) and labels (y) separate pannurom
-X = data.drop(columns=["attack_type", "difficulty_level", "label"])
-y = data["label"]
+def main():
+    X_train, y_train = load_dataset("KDDTrain+.txt")
+    X_test, y_test = load_dataset("KDDTest+.txt")
 
-print("Total records:", len(X))
-print("Normal:", (y == 0).sum(), "| Attack:", (y == 1).sum())
+    # Encode nominal categories without imposing an integer order. Fit the
+    # category columns on training data only, then align the test columns.
+    X_train = pd.get_dummies(X_train, columns=CATEGORICAL_COLUMNS)
+    X_test = pd.get_dummies(X_test, columns=CATEGORICAL_COLUMNS)
+    X_test = X_test.reindex(columns=X_train.columns, fill_value=0)
 
-# STEP 4: scaling - ella numbers ah same range ku kondu varurom
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
+    print("Training Isolation Forest on KDDTrain+...")
+    model = IsolationForest(
+        n_estimators=100,
+        contamination="auto",
+        random_state=42,
+        n_jobs=-1
+    )
+    model.fit(X_train)
 
-# STEP 5: Isolation Forest model
-contamination_rate = (y == 1).sum() / len(y)
-model = IsolationForest(n_estimators=100, contamination=contamination_rate, random_state=42)
+    # Isolation Forest returns 1 for inliers and -1 for outliers.
+    predictions = (model.predict(X_test) == -1).astype(int)
 
-print("\nTraining model... (idhu konjam neram edukkalam)")
-model.fit(X_scaled)
+    print("\nDataset sizes")
+    print(f"Training records: {len(X_train):,}")
+    print(f"Test records:     {len(X_test):,}")
+    print("\nHeld-out KDDTest+ performance")
+    print(classification_report(
+        y_test,
+        predictions,
+        labels=[0, 1],
+        target_names=["Normal", "Attack"],
+        digits=4,
+        zero_division=0
+    ))
 
-# STEP 6: predictions
-predictions = model.predict(X_scaled)
-predictions = [1 if p == -1 else 0 for p in predictions]
 
-# STEP 7: evaluate
-print("\n--- Model Performance ---")
-print(classification_report(y, predictions, target_names=["Normal", "Attack"]))
+if __name__ == "__main__":
+    main()
