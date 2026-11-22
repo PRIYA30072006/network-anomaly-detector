@@ -59,13 +59,18 @@ python train_model.py
 python train_supervised.py
 python test_on_realdata.py
 python test_improved.py
+python evaluate_model.py
 ```
 
-To retrain and save the model files:
+`evaluate_model.py` trains the 300-tree balanced Random Forest on KDDTrain+ and reports results on the separate KDDTest+ file, including a confusion matrix and counts of previously unseen categorical values.
+
+To retrain and save the model files used by the Streamlit demo:
 
 ```bash
 python save_model.py
 ```
+
+After changing the preprocessing format, regenerate the saved model artifacts before opening the app. The existing committed `.pkl` files were created with the previous encoder and may be incompatible with the updated app.
 
 To launch the manual-input demo:
 
