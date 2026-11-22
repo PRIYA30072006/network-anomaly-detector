@@ -1,6 +1,6 @@
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OrdinalEncoder
 import joblib
 
 column_names = [
@@ -20,26 +20,22 @@ column_names = [
 ]
 
 train_data = pd.read_csv("KDDTrain+.txt", names=column_names)
-train_data["label"] = train_data["attack_type"].apply(lambda x: 0 if x == "normal" else 1)
+train_data["label"] = (train_data["attack_type"] != "normal").astype(int)
 
-# Encoders save pannanum, demo la user input convert panna venum adhukku
-encoders = {}
 text_columns = ["protocol_type", "service", "flag"]
-for col in text_columns:
-    le = LabelEncoder()
-    train_data[col] = le.fit_transform(train_data[col])
-    encoders[col] = le
+encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
+train_data[text_columns] = encoder.fit_transform(train_data[text_columns])
 
 X_train = train_data.drop(columns=["attack_type", "difficulty_level", "label"])
 y_train = train_data["label"]
 
-print("Training final model...")
+print("Training final Random Forest model...")
 clf = RandomForestClassifier(n_estimators=300, class_weight="balanced", random_state=42)
 clf.fit(X_train, y_train)
 
-# Model and encoders ah file ah save pannurom
+# Save the model and its matching preprocessing metadata together.
 joblib.dump(clf, "model.pkl")
-joblib.dump(encoders, "encoders.pkl")
+joblib.dump(encoder, "encoders.pkl")
 joblib.dump(list(X_train.columns), "columns.pkl")
 
-print("Model saved successfully! (model.pkl, encoders.pkl, columns.pkl)")
+print("Saved model.pkl, encoders.pkl (OrdinalEncoder), and columns.pkl.")

@@ -1,91 +1,128 @@
 # AI-Based Network Anomaly Detector
 
 ## Problem Statement
-Traditional network security relies on rule-based systems (fixed signatures) to detect
-attacks, which fail against new or evolving attack patterns. This project explores
-whether machine learning can detect anomalous (attack) network traffic using the
-NSL-KDD dataset — a benchmark dataset for intrusion detection research — by learning
-patterns from historical connection records instead of hardcoded rules.
+Traditional network security often uses rule-based detection. This project explores whether machine learning can identify unusual network connection records using the NSL-KDD benchmark dataset.
+
+**Project scope:** This is a dataset-based student prototype. The Streamlit interface accepts manually entered connection details. It does not capture or monitor live network traffic.
 
 ## Dataset
-- **Source:** NSL-KDD (improved version of the KDD Cup 1999 dataset), a widely-used
-  benchmark for intrusion detection research.
-- **Training set:** KDDTrain+ (125,973 records)
-- **Test set:** KDDTest+ (22,544 records) — a completely separate file, used to
-  evaluate the model on traffic patterns it never saw during training.
-- **Features:** 41 network connection attributes (e.g. duration, protocol type,
-  bytes sent/received, connection flags, service type) plus an attack label.
-- **Label conversion:** The original dataset has 23 specific attack types
-  (e.g. neptune, smurf, satan). These were converted into a binary label —
-  `0 = normal`, `1 = attack` — for this project's scope.
+- **Dataset:** NSL-KDD
+- **Training file:** `KDDTrain+.txt` (125,973 records)
+- **Test file:** `KDDTest+.txt` (22,544 records)
+- **Features:** 41 connection attributes, plus attack type and difficulty level.
+- **Binary labels:** `0 = normal`, `1 = attack`.
 
-## Approach
+Place both dataset files in the **project root directory**, alongside the Python scripts. The scripts currently read the files directly from this location; they do not read from an `archive/` folder.
 
-### 1. Unsupervised Detection — Isolation Forest
-Tried first, since real-world anomaly detection often has no labeled attack data.
-Isolation Forest flags outliers based on statistical structure alone, without using
-the attack labels during training.
-- **Result: ~60% accuracy**
-- **Why it struggled:** Attack and normal traffic in NSL-KDD statistically overlap
-  in several features, so pure unsupervised outlier detection could not cleanly
-  separate them.
+## Methods explored
 
-### 2. Supervised Detection — Random Forest
-Since labels were available, a Random Forest classifier was trained next.
-- **Initial result (same-file train/test split): 100% accuracy**
-- This was treated as a red flag rather than a success. NSL-KDD is known to contain
-  near-duplicate records across splits, so a same-file split can let the model
-  effectively memorize rather than generalize.
-- **Corrected test (trained on KDDTrain+, evaluated on the separate KDDTest+ file):**
-  - Accuracy: **77%**
-  - Attack precision: **0.97** (very few false alarms when it flags an attack)
-  - Attack recall: **0.62** (misses ~38% of actual attacks)
+### 1. Isolation Forest
+An unsupervised anomaly-detection baseline. The current script fits and evaluates on the same training file, so its printed metrics should be treated as an exploratory training-set result, not as performance on unseen data.
 
-### 3. Tuning — Class Balancing + More Trees
-Tried `class_weight="balanced"` and increased trees (100 → 300) to address the
-class imbalance (67,343 normal vs 58,630 attack records) and improve recall.
-- **Result: 78% accuracy, recall 0.63** — only a marginal improvement.
-- This suggested the bottleneck was not model configuration but the underlying
-  statistical overlap between certain attack types and normal traffic.
+### 2. Random Forest
+A supervised classifier trained using the dataset's normal/attack labels. The repository includes a same-file random split experiment and a separate KDDTrain+/KDDTest+ evaluation.
 
-### 4. Feature Importance Analysis
-Checked which features the Random Forest relied on most:
-1. `src_bytes` (18.7%) — bytes sent
-2. `dst_bytes` (10.4%) — bytes received
-3. `flag` (8.5%) — connection status
-4. `same_srv_rate` (8.2%)
-5. `dst_host_same_srv_rate` (6.1%)
+### 3. Class balancing and feature importance
+A second Random Forest experiment uses class balancing and 300 trees. Feature importance is printed to help inspect which input columns the model uses. Feature importance does not prove that a feature causes an attack.
 
-These align with security intuition: abnormal data volumes and repeated
-connections to the same service are classic indicators of DoS and probing attacks.
+## Repository files
 
-## Key Limitation (Honest Trade-off)
-The final model has **high precision (0.97) but moderate recall (0.62–0.63)** for
-attacks. In practice, this means: when the model says "attack," it is almost always
-right — but it misses a significant portion of real attacks (false negatives).
+| File | Purpose |
+|---|---|
+| `explore_data.py` | Loads and explores the training dataset. |
+| `train_model.py` | Trains an Isolation Forest baseline on KDDTrain+ and evaluates it on the separate KDDTest+ file. |
+| `train_supervised.py` | Trains and evaluates a Random Forest using a random split of KDDTrain+. |
+| `test_on_realdata.py` | Trains on KDDTrain+ and evaluates on KDDTest+. |
+| `test_improved.py` | Tests a class-balanced Random Forest with 300 trees and prints feature importance. |
+| `evaluate_model.py` | Runs a reproducible held-out evaluation and prints a confusion matrix, classification report, and unseen-category counts. |
+| `save_model.py` | Trains the model used by the Streamlit demo and saves the model, encoders, and feature-column list. |
+| `app.py` | Runs the Streamlit demonstration using uploaded CSV records containing all 41 model features. |
+| `model.pkl` | Saved Random Forest model used by the demo. |
+| `encoders.pkl` | Saved encoders for the three categorical input columns. |
+| `columns.pkl` | Feature-column order expected by the saved model. |
+| `KDDTrain+.txt` | NSL-KDD training dataset. |
+| `KDDTest+.txt` | NSL-KDD test dataset. |
 
-For a real intrusion detection system, this is a meaningful trade-off. Missing an
-attack is generally more costly than investigating a false alarm, so a security team
-would likely tune the threshold to prioritize recall over precision — accepting more
-false alarms in exchange for catching more real attacks. This project did not pursue
-that tuning further, in order to keep scope manageable, but it is the clear next step.
+## Requirements
+The project was tested locally in a Python virtual environment. Use a supported Python version compatible with the installed scikit-learn and Streamlit releases. Install the dependencies from the repository root:
 
-## Tech Stack
-- Python 3.13
-- pandas — data loading and preprocessing
-- scikit-learn — Isolation Forest, Random Forest, preprocessing, evaluation
+```bash
+python -m venv .venv
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+# macOS/Linux:
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
 
-## How to Run
-1. Install dependencies: `pip install pandas scikit-learn matplotlib`
-2. Download the NSL-KDD dataset and place `KDDTrain+.txt` and `KDDTest+.txt`
-   inside an `archive/` folder in the project directory.
-3. Run:
-   - `python explore_data.py` — inspect the dataset
-   - `python train_model.py` — unsupervised Isolation Forest baseline
-   - `python test_on_realdata.py` — supervised Random Forest, proper train/test split
-   - `python test_improved.py` — tuned model + feature importance
+## Run the project
 
-## Possible Future Improvements
-- Try gradient boosting algorithms (XGBoost, LightGBM) for potentially better recall
-- Multi-class classification (predict specific attack type, not just normal/attack)
-- Threshold tuning to explicitly prioritize recall for a security-first use case
+Run commands from the project root, where the dataset files are stored.
+
+```bash
+python explore_data.py
+python train_model.py
+python train_supervised.py
+python test_on_realdata.py
+python test_improved.py
+python evaluate_model.py
+```
+
+`evaluate_model.py` trains the 300-tree balanced Random Forest on KDDTrain+ and reports results on the separate KDDTest+ file, including a confusion matrix and counts of previously unseen categorical values.
+
+To retrain and save the model files used by the Streamlit demo:
+
+```bash
+python save_model.py
+```
+
+The `audit/corrections` branch includes model artifacts regenerated with the same `OrdinalEncoder` format expected by `app.py`. If you retrain or change preprocessing, regenerate all three artifact files together by running `python save_model.py` before launching the app.
+
+To launch the manual-input demo:
+
+```bash
+streamlit run app.py
+```
+
+## Results and interpretation
+
+Latest recorded run of `python evaluate_model.py` on the separate KDDTest+ file:
+
+| Metric | Normal | Attack |
+|---|---:|---:|
+| Precision | 0.6644 | 0.9671 |
+| Recall | 0.9718 | 0.6285 |
+| F1-score | 0.7892 | 0.7619 |
+| Support | 9,711 | 12,833 |
+
+- **Accuracy:** 0.7764 (77.64%)
+- **Confusion matrix** (rows = actual class; columns = predicted class; order = Normal, Attack):
+
+```text
+              Predicted Normal  Predicted Attack
+Actual Normal             9437               274
+Actual Attack             4767              8066
+```
+
+The model detected 8,066 of 12,833 attack records and missed 4,767. Its attack precision is high (96.71%), but attack recall is only 62.85%. This means many records predicted as attacks were attacks in this test, but the model still failed to identify a substantial share of actual attacks. Accuracy alone is not enough to judge an intrusion-detection model.
+
+These figures are the output reported from the current `evaluate_model.py` run; rerun the script in your environment to reproduce them. Results can vary with library versions or environment changes.
+
+## Issues identified during testing and ongoing corrective work
+
+Testing and static review have identified several issues. Some implementation changes have now been made, but they must be run and verified in the project environment before they can be considered fully resolved.
+
+| Finding | Change made / current status |
+|---|---|
+| The previous Streamlit form accepted only 11 of 41 features and filled the rest with zero. | Replaced the partial form with CSV upload requiring all 41 feature columns; added checks for missing columns, empty categorical values, and non-numeric feature values. Runtime verification is pending. |
+| The Isolation Forest baseline was evaluated on its training records and used a contamination value derived from attack labels. | Revised it to fit on KDDTrain+ and evaluate on KDDTest+, with `contamination="auto"`. Runtime verification is pending. |
+| Ordinal encoding assigns integer codes to nominal categories and may introduce artificial ordering. | Still present in the supervised Random Forest workflow and saved demo artifacts. Alternative one-hot preprocessing needs to be evaluated before changing the artifact format. |
+| Dependency versions are not pinned. | Need to record the actual working environment versions before pinning dependencies; no versions have been guessed. |
+| Dataset source citation is missing. | The canonical dataset source and citation details still need to be verified and added. |
+
+The recorded KDDTest+ Random Forest evaluation reports 62.85% attack recall and 4,767 missed attack records. This is a significant detection weakness and remains an important target for further experiments. Do not treat the reported accuracy alone as evidence of a dependable intrusion-detection system.
+
+**Verification status:** The changes above have been committed to this branch, but they have not yet been executed in the user's local environment after the latest edits. The earlier Random Forest metrics are prior reported output, not fresh test evidence for these new changes.
+
+## Responsible use
+This is an educational prototype for learning and experimentation with a public benchmark dataset. It is not a production intrusion-detection system and should not be used as the sole basis for security decisions.

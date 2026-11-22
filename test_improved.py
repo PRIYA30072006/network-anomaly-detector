@@ -1,6 +1,6 @@
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OrdinalEncoder
 from sklearn.metrics import classification_report
 
 column_names = [
@@ -22,39 +22,27 @@ column_names = [
 train_data = pd.read_csv("KDDTrain+.txt", names=column_names)
 test_data = pd.read_csv("KDDTest+.txt", names=column_names)
 
-train_data["label"] = train_data["attack_type"].apply(lambda x: 0 if x == "normal" else 1)
-test_data["label"] = test_data["attack_type"].apply(lambda x: 0 if x == "normal" else 1)
+for data in (train_data, test_data):
+    data["label"] = (data["attack_type"] != "normal").astype(int)
 
 text_columns = ["protocol_type", "service", "flag"]
-for col in text_columns:
-    le = LabelEncoder()
-    le.fit(train_data[col])
-    train_data[col] = le.transform(train_data[col])
-    test_data[col] = test_data[col].apply(lambda x: x if x in le.classes_ else le.classes_[0])
-    test_data[col] = le.transform(test_data[col])
+encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
+train_data[text_columns] = encoder.fit_transform(train_data[text_columns])
+test_data[text_columns] = encoder.transform(test_data[text_columns])
 
 X_train = train_data.drop(columns=["attack_type", "difficulty_level", "label"])
 y_train = train_data["label"]
 X_test = test_data.drop(columns=["attack_type", "difficulty_level", "label"])
 y_test = test_data["label"]
 
-print("Training improved Random Forest (balanced + more trees)...")
-
-# IMPROVEMENT 1: class_weight="balanced" - imbalance handle pannum
-# IMPROVEMENT 2: n_estimators=300 - more trees, better learning
-clf = RandomForestClassifier(
-    n_estimators=300,
-    class_weight="balanced",
-    random_state=42
-)
+print("Training improved Random Forest (balanced + 300 trees)...")
+clf = RandomForestClassifier(n_estimators=300, class_weight="balanced", random_state=42)
 clf.fit(X_train, y_train)
-
 predictions = clf.predict(X_test)
 
 print("\n--- Improved Model Performance ---")
 print(classification_report(y_test, predictions, target_names=["Normal", "Attack"]))
 
-# IMPROVEMENT 3: Feature importance - endha columns real ah help pannudhu nu paakalam
-print("\n--- Top 10 Most Important Features ---")
+print("\n--- Top 10 Feature Importances ---")
 importances = pd.Series(clf.feature_importances_, index=X_train.columns)
 print(importances.sort_values(ascending=False).head(10))

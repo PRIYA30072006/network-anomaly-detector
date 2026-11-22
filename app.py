@@ -1,64 +1,112 @@
 import streamlit as st
 import pandas as pd
 import joblib
+from sklearn.preprocessing import OrdinalEncoder
 
-# Model and encoders load pannurom
-model = joblib.load("model.pkl")
-encoders = joblib.load("encoders.pkl")
-columns = joblib.load("columns.pkl")
+st.set_page_config(page_title="AI Network Anomaly Detector", page_icon="🛡️")
+
+@st.cache_resource
+def load_artifacts():
+    model = joblib.load("model.pkl")
+    encoder = joblib.load("encoders.pkl")
+    columns = joblib.load("columns.pkl")
+
+    if not isinstance(encoder, OrdinalEncoder):
+        raise TypeError(
+            "The saved encoder is not an OrdinalEncoder. "
+            "Run `python save_model.py` to regenerate all model artifacts."
+        )
+    if len(encoder.categories_) != 3:
+        raise ValueError("The saved encoder must contain the three expected categorical features.")
+    if not hasattr(model, "classes_") or set(model.classes_) != {0, 1}:
+        raise ValueError("The saved model must contain both classes: 0 (Normal) and 1 (Attack).")
+    if len(columns) != 41 or len(set(columns)) != 41:
+        raise ValueError("The saved feature-column list must contain 41 unique columns.")
+    return model, encoder, columns
+
 
 st.title("🛡️ AI Network Anomaly Detector")
-st.write("Enter connection details below to check if it's Normal or an Attack.")
+st.write("Upload complete connection records as a CSV file for a dataset-trained demonstration.")
+st.info(
+    "This is a dataset-based prototype. It does not capture or monitor live network traffic. "
+    "Each uploaded row must contain all 41 model features."
+)
 
-st.markdown("---")
+try:
+    model, encoder, columns = load_artifacts()
+except Exception as exc:
+    st.error(f"Could not load compatible model artifacts: {exc}")
+    st.stop()
 
-# User input fields
-col1, col2 = st.columns(2)
+uploaded_file = st.file_uploader(
+    "Upload a CSV containing complete network connection records",
+    type=["csv"]
+)
 
-with col1:
-    duration = st.number_input("Duration (seconds)", min_value=0, value=0)
-    protocol_type = st.selectbox("Protocol Type", encoders["protocol_type"].classes_)
-    service = st.selectbox("Service", encoders["service"].classes_)
-    flag = st.selectbox("Flag", encoders["flag"].classes_)
-    src_bytes = st.number_input("Source Bytes (data sent)", min_value=0, value=0)
-    dst_bytes = st.number_input("Destination Bytes (data received)", min_value=0, value=0)
+if uploaded_file is not None:
+    try:
+        raw_data = pd.read_csv(uploaded_file)
+    except Exception as exc:
+        st.error(f"Could not read the CSV file: {exc}")
+        st.stop()
 
-with col2:
-    logged_in = st.selectbox("Logged In?", [0, 1])
-    count = st.number_input("Connection Count (same host)", min_value=0, value=1)
-    srv_count = st.number_input("Service Count", min_value=0, value=1)
-    same_srv_rate = st.slider("Same Service Rate", 0.0, 1.0, 0.5)
-    diff_srv_rate = st.slider("Different Service Rate", 0.0, 1.0, 0.0)
+    missing_columns = [column for column in columns if column not in raw_data.columns]
+    if missing_columns:
+        st.error(
+            f"CSV is missing {len(missing_columns)} required feature columns: "
+            + ", ".join(missing_columns)
+        )
+        st.stop()
 
-st.markdown("---")
+    if raw_data.empty:
+        st.error("The uploaded CSV contains no records.")
+        st.stop()
 
-if st.button("🔍 Check Connection"):
-    # Default values for rest of the 41 columns (real deployment la ellame irukum,
-    # demo ku namba key features mattum kudukurom, baaki default 0 vachukurom)
-    input_data = {col: 0 for col in columns}
+    input_data = raw_data.loc[:, columns].copy()
+    text_columns = ["protocol_type", "service", "flag"]
+    numeric_columns = [column for column in columns if column not in text_columns]
 
-    input_data["duration"] = duration
-    input_data["protocol_type"] = encoders["protocol_type"].transform([protocol_type])[0]
-    input_data["service"] = encoders["service"].transform([service])[0]
-    input_data["flag"] = encoders["flag"].transform([flag])[0]
-    input_data["src_bytes"] = src_bytes
-    input_data["dst_bytes"] = dst_bytes
-    input_data["logged_in"] = logged_in
-    input_data["count"] = count
-    input_data["srv_count"] = srv_count
-    input_data["same_srv_rate"] = same_srv_rate
-    input_data["diff_srv_rate"] = diff_srv_rate
+    for column in numeric_columns:
+        input_data[column] = pd.to_numeric(input_data[column], errors="coerce")
 
-    # Correct column order la DataFrame create pannurom
-    input_df = pd.DataFrame([input_data])[columns]
+    if input_data[numeric_columns].isna().any().any():
+        bad_columns = input_data[numeric_columns].columns[
+            input_data[numeric_columns].isna().any()
+        ].tolist()
+        st.error("Missing or non-numeric values found in: " + ", ".join(bad_columns))
+        st.stop()
 
-    prediction = model.predict(input_df)[0]
-    probability = model.predict_proba(input_df)[0]
+    if input_data[text_columns].isna().any().any():
+        st.error("Categorical fields protocol_type, service, and flag cannot be empty.")
+        st.stop()
 
-    if prediction == 1:
-        st.error(f"🚨 ATTACK DETECTED (confidence: {probability[1]*100:.1f}%)")
-    else:
-        st.success(f"✅ NORMAL TRAFFIC (confidence: {probability[0]*100:.1f}%)")
+    try:
+        input_data[text_columns] = encoder.transform(input_data[text_columns])
+        predictions = model.predict(input_data)
+        probabilities = model.predict_proba(input_data)
+    except Exception as exc:
+        st.error(f"Prediction failed. Check the CSV feature values and model artifacts: {exc}")
+        st.stop()
 
-st.markdown("---")
-st.caption("Note: This demo uses the NSL-KDD dataset for training. Predictions are simulated on manually entered values, not live network traffic.")
+    class_positions = {label: index for index, label in enumerate(model.classes_)}
+    attack_scores = probabilities[:, class_positions[1]]
+
+    results = pd.DataFrame({
+        "Prediction": ["ATTACK" if value == 1 else "NORMAL" for value in predictions],
+        "Attack model score (%)": (attack_scores * 100).round(1)
+    })
+
+    st.subheader("Prediction results")
+    st.dataframe(results, use_container_width=True)
+    st.caption(
+        "Model scores are not calibrated probabilities or guarantees. "
+        "Predictions depend on the quality and representativeness of the uploaded records."
+    )
+    st.write(f"Records analysed: {len(results):,}")
+    st.write(f"Predicted attacks: {int((predictions == 1).sum()):,}")
+    st.write(f"Predicted normal: {int((predictions == 0).sum()):,}")
+
+st.caption(
+    "Expected input: one row per connection, with all 41 NSL-KDD model feature columns. "
+    "Do not include attack_type or difficulty_level as model input."
+)
